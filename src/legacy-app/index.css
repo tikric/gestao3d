@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Global focus and element aesthetic adjustments */
+* {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Elegant premium smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* Custom Premium Low-Profile Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+/* Glow signature removed per user request */
+
+/* Lime selection + focus highlight across the whole legacy app */
+::selection {
+  background: rgba(190, 242, 100, 0.35);
+  color: #0a0f0c;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(190, 242, 100, 0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(190, 242, 100, 0.15);
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Apple/Awwwards Glassmorphism Card System */
+.glass-panel {
+  background: rgba(14, 14, 18, 0.5) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 24px 50px -12px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+}
+
+.glass-panel-hover {
+  transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-panel-hover:hover {
+  transform: translateY(-4px) !important;
+  background: rgba(20, 20, 28, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.95), 0 0 20px 0px rgba(var(--brand-primary), 0.03) !important;
+}
+
+/* Neon Text Gradient */
+.text-glow-amber {
+  background: linear-gradient(135deg, #FFFFFF 0%, #C7F26B 50%, #A5D84B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(244, 110, 31, 0.15));
+}
+
+/* Sleek border pulse animation */
+@keyframes neonPulse {
+  0%, 100% { border-color: rgba(255, 255, 255, 0.05); }
+  50% { border-color: color-mix(in srgb, var(--brand-primary) 35%, transparent); }
+}
+
+.pulse-border {
+  animation: neonPulse 4s infinite ease-in-out;
+}
+
+/* Grid Dots Background overlay */
+.bg-grid-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* Premium Staggered Fade & Slide In Animations */
+@keyframes premiumSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-premium-fade {
+  animation: premiumSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Delays for Staggered list renderings */
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-250 { animation-delay: 250ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+
+/* Custom indicator soft pulse */
+@keyframes glowDot {
+  0%, 100% { transform: scale(1); opacity: 0.8; filter: drop-shadow(0 0 2px var(--brand-primary)); }
+  50% { transform: scale(1.3); opacity: 1; filter: brightness(1.3) drop-shadow(0 0 6px var(--brand-primary)); }
+}
+
+.glow-active-dot {
+  animation: glowDot 2.2s infinite ease-in-out;
+}
+
+/* Exquisite Button scale transitions */
+.btn-premium {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-premium:hover {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+}
+.btn-premium:active {
+  transform: scale(0.98);
+}
+
+

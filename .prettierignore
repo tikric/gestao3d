@@ -1,0 +1,10 @@
+node_modules
+dist
+.output
+.vinxi
+.lovable
+src/legacy-app
+pnpm-lock.yaml
+package-lock.json
+bun.lock
+routeTree.gen.ts

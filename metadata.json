@@ -1,0 +1,6 @@
+{
+  "name": "Gestão 3D — Ateliê 3D Hub",
+  "description": "Sistema completo de gestão para ateliês de impressão 3D: produção, CRM, custos, integrações e vitrine.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
