@@ -29,35 +29,176 @@ function getFallbackKey(request: Request, url: URL): string {
   return "";
 }
 
-function isBlockedGoogleUrl(value: string | null | undefined): boolean {
-  if (!value) return true;
+function cleanGoogleShoppingUrl(urlStr: string): string {
+  if (!urlStr || typeof urlStr !== "string") return urlStr;
   try {
-    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
-    return (
-      host === "google.com" ||
-      host.endsWith(".google.com") ||
-      host === "googleadservices.com" ||
-      host.endsWith(".googleadservices.com")
-    );
-  } catch {
-    return true;
-  }
+    const parsed = new URL(urlStr);
+
+    // Check common redirect parameters
+    const redirectParams = ["adurl", "url", "u", "q", "dest", "target", "r", "merchant_url"];
+    for (const param of redirectParams) {
+      const val = parsed.searchParams.get(param);
+      if (val && /^https?:\/\//i.test(val)) {
+        return val;
+      }
+    }
+  } catch {}
+  return urlStr;
 }
 
 function merchantSearchUrl(storeName: string, productName: string): string {
-  const query = encodeURIComponent(productName || "filamento impressora 3d");
+  const query = encodeURIComponent(productName || "filamento impressora 3d 1kg");
+  const store = String(storeName || "").toLowerCase();
+
+  if (store.includes("shopee")) {
+    return `https://shopee.com.br/search?keyword=${query}`;
+  }
+  if (store.includes("mercado livre") || store.includes("mercadolivre")) {
+    return `https://lista.mercadolivre.com.br/${query}`;
+  }
+  if (store.includes("amazon")) {
+    return `https://www.amazon.com.br/s?k=${query}`;
+  }
+  if (store.includes("magalu") || store.includes("magazine luiza")) {
+    return `https://www.magazineluiza.com.br/busca/${query}`;
+  }
   return `https://www.buscape.com.br/search?q=${query}`;
 }
 
 function pickProductUrl(r: any, query: string): string {
-  // Prefer direct merchant URL, then SerpApi's product page, then the
-  // Google Shopping redirect link (works in a new tab — redirects to the
-  // merchant product page). Fall back to a Buscapé search by title.
-  const candidates = [r.product_link, r.link, r.serpapi_product_api];
+  const candidates = [r.product_link, r.link, r.shopping_link, r.serpapi_product_api];
+
+  // 1) First attempt: check if any candidate unwraps into a direct non-Google merchant link
   for (const c of candidates) {
-    if (typeof c === "string" && /^https?:\/\//i.test(c)) return c;
+    if (typeof c === "string" && /^https?:\/\//i.test(c)) {
+      const cleaned = cleanGoogleShoppingUrl(c);
+      try {
+        const host = new URL(cleaned).hostname.toLowerCase();
+        if (
+          !host.includes("google.com") &&
+          !host.includes("googleadservices.com") &&
+          !host.includes("serpapi.com")
+        ) {
+          return cleaned;
+        }
+      } catch {}
+    }
   }
+
+  // 2) Second attempt: return the Google Shopping product link itself
+  for (const c of candidates) {
+    if (typeof c === "string" && /^https?:\/\//i.test(c)) {
+      const cleaned = cleanGoogleShoppingUrl(c);
+      if (!cleaned.includes("serpapi.com")) {
+        return cleaned;
+      }
+    }
+  }
+
+  // 3) Fallback
   return merchantSearchUrl(r.source || r.store || "", r.title || query);
+}
+
+function isInvalidFilamentSpool(title: string, price: number, query: string): boolean {
+  if (!title) return true;
+  const t = title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const q = query
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const isFilamentQuery =
+    q.includes("filamento") ||
+    q.includes("pla") ||
+    q.includes("petg") ||
+    q.includes("tpu") ||
+    q.includes("silk") ||
+    q.includes("1kg") ||
+    q.includes("abs");
+
+  if (isFilamentQuery) {
+    // 1) Reject explicit non-1kg weights in title (250g, 500g, 250 gr, 0.25kg, 0.5kg, 100g, 50g, 300g, 200g, 750g, etc)
+    const non1kgPatterns = [
+      /\b250\s*g\b/,
+      /\b250\s*gr\b/,
+      /\b250\s*gramas?\b/,
+      /\b0[,\.]25\s*kg\b/,
+      /\b500\s*g\b/,
+      /\b500\s*gr\b/,
+      /\b500\s*gramas?\b/,
+      /\b0[,\.]5\s*kg\b/,
+      /\b100\s*g\b/,
+      /\b50\s*g\b/,
+      /\b200\s*g\b/,
+      /\b300\s*g\b/,
+      /\b750\s*g\b/,
+      /\b250g\b/,
+      /\b500g\b/,
+      /\b100g\b/,
+      /\b50g\b/,
+      /\b200g\b/,
+      /\b300g\b/,
+      /\b750g\b/,
+      /\bamostras?\b/,
+      /\bsamples?\b/,
+      /\bcaneta\s*3d\b/,
+      /\brefil\s*caneta\b/,
+      /\b10\s*m(etros)?\b/,
+      /\b5\s*m(etros)?\b/,
+      /\b15\s*m(etros)?\b/,
+      /\bkit\s*amostra\b/,
+    ];
+
+    for (const pattern of non1kgPatterns) {
+      if (pattern.test(t)) {
+        return true;
+      }
+    }
+
+    // 2) Reject accessories / non-spool items
+    const accessoryKeywords = [
+      "bico",
+      "bicos",
+      "adesivo",
+      "suporte",
+      "cola",
+      "limpeza",
+      "ptfe",
+      "tubo",
+      "conector",
+      "garganta",
+      "meia",
+      "silicone",
+      "termistor",
+      "cartucho",
+      "resistencia",
+      "graxa",
+      "chave",
+      "agulha",
+      "spray",
+      "mola",
+      "correia",
+      "sensor",
+      "placa",
+      "cooler",
+      "ventoinha",
+      "extrusora",
+      "hotend",
+    ];
+    if (accessoryKeywords.some((kw) => t.includes(kw))) {
+      return true;
+    }
+
+    // 3) Price threshold: 1kg spools in BR are at least R$ 42
+    if (price < 42.0) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function fetchShopping(query: string, apiKey: string) {
@@ -90,7 +231,7 @@ async function fetchShopping(query: string, apiKey: string) {
         buyUrl: pickProductUrl(r, query),
         thumbnail: r.thumbnail || "",
       }))
-      .filter((o: any) => o.price > 0);
+      .filter((o: any) => o.price > 0 && !isInvalidFilamentSpool(o.productName, o.price, query));
   } catch {
     return [];
   } finally {
@@ -105,7 +246,7 @@ const DEFAULT_MATERIALS: Array<{ type: string; query: string }> = [
   { type: "SILK", query: "filamento silk pla 1.75mm 1kg impressora 3d" },
 ];
 
-const TOP_N = 10;
+const TOP_N = 5;
 const topByPrice = <T extends { price: number }>(offers: T[]): T[] =>
   [...offers].sort((a, b) => a.price - b.price).slice(0, TOP_N);
 

@@ -177,23 +177,24 @@ function AgendaPage() {
 
   const cells = useMemo(() => {
     if (!cursor) return [];
-    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    const first = new Date(year, month, 1);
     const startDow = first.getDay();
-    const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
     const arr: { date: string; day: number; inMonth: boolean }[] = [];
     for (let i = 0; i < startDow; i++) {
-      const d = new Date(first);
-      d.setDate(d.getDate() - (startDow - i));
+      const d = new Date(year, month, 1 - (startDow - i));
       arr.push({ date: fmt(d), day: d.getDate(), inMonth: false });
     }
     for (let i = 1; i <= daysInMonth; i++) {
-      const d = new Date(cursor.getFullYear(), cursor.getMonth(), i);
+      const d = new Date(year, month, i);
       arr.push({ date: fmt(d), day: i, inMonth: true });
     }
+    let nextDay = 1;
     while (arr.length % 7 !== 0 || arr.length < 42) {
-      const last = new Date(arr[arr.length - 1].date);
-      last.setDate(last.getDate() + 1);
-      arr.push({ date: fmt(last), day: last.getDate(), inMonth: false });
+      const d = new Date(year, month + 1, nextDay++);
+      arr.push({ date: fmt(d), day: d.getDate(), inMonth: false });
       if (arr.length >= 42) break;
     }
     return arr;
@@ -431,12 +432,12 @@ function AgendaPage() {
                       className="aspect-square rounded-md border border-white/5"
                     />
                   ))
-                : cells.map((cell) => {
+                : cells.map((cell, idx) => {
                     const isToday = cell.date === today;
                     const isSel = cell.date === selected;
                     return (
                       <button
-                        key={cell.date + cell.day}
+                        key={`${cell.date}-${idx}`}
                         onClick={() => setSelected(cell.date)}
                         className={`aspect-square grid place-items-center rounded-md border text-[11px] transition-all
                           ${isSel ? "border-cyan-400/60 bg-cyan-500/10" : "border-white/5 hover:border-white/20"}

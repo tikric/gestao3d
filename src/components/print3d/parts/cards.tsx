@@ -598,7 +598,11 @@ export function FilamentQuotes({ onSelectTab }: { onSelectTab?: (t: number) => v
   };
 
   return (
-    <Card glow="#047857" className="cursor-pointer transition hover:border-white/[0.12]" onClick={openQuotes}>
+    <Card
+      glow="#047857"
+      className="cursor-pointer transition hover:border-white/[0.12]"
+      onClick={openQuotes}
+    >
       <div className="flex items-baseline justify-between mb-1">
         <h3 className="text-[14px] font-semibold text-white">Cotação de Filamentos</h3>
         <span className="text-[10px] text-white/40">SerpAPI</span>

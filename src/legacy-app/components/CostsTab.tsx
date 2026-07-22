@@ -5097,62 +5097,36 @@ Utilize a nossa nova calculadora de formação de preço de produtos para obter 
               </div>
             );
           })()}
-          {/* Header Description */}
-          <div className="p-3 bg-gradient-to-r from-[#17211B] to-[#121A15] border border-[#232B27] rounded-xl flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <TrendingUp className="h-4 w-4 text-[#E2B144] shrink-0" />
-              <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-500 text-black px-2 py-0.5 rounded-full font-black uppercase font-mono tracking-wider shrink-0">AO VIVO</span>
-              <span className="text-[11px] font-bold text-white truncate">Top 5 ofertas — Google Shopping</span>
+          {/* Header Description & Single Search Button to Fetch All Quotes At Once */}
+          <div className="p-4 bg-[#151917] border border-[#232B27] rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-left">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-[#E2B144] shrink-0" />
+                <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-500 text-black px-2 py-0.5 rounded-full font-black uppercase font-mono tracking-wider shrink-0">AO VIVO</span>
+                <span className="text-xs font-bold text-white">Top 5 ofertas — Google Shopping</span>
+              </div>
+              <p className="text-[11px] text-[#8BA58D]">
+                Consulte e compare os preços de PLA, PETG, TPU e SILK em tempo real. Clique abaixo para buscar todas de uma vez.
+              </p>
               {lastQuotesUpdate && (
-                <span className="text-[10px] text-amber-400 font-mono hidden sm:inline shrink-0">· {lastQuotesUpdate}</span>
+                <div className="text-[10px] text-amber-400 font-mono">
+                  Sincronizado: {lastQuotesUpdate}
+                </div>
               )}
             </div>
             <button
+              type="button"
               onClick={() => fetchLiveQuotes(false)}
               disabled={loadingQuotes}
-              className={`px-3 py-1.5 cursor-pointer rounded-lg font-black text-[11px] transition flex items-center justify-center gap-1.5 select-none border shrink-0 ${
+              className={`w-full md:w-auto px-6 py-2.5 cursor-pointer rounded-xl font-black text-xs transition flex items-center justify-center gap-2 select-none border shrink-0 ${
                 loadingQuotes 
                 ? 'bg-[#151917] text-zinc-500 border-[#232B27] cursor-not-allowed' 
-                : 'bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black border-amber-400 active:scale-95'
+                : 'bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)] active:scale-95'
               }`}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${loadingQuotes ? 'animate-spin text-zinc-500' : 'text-black'}`} />
-              {loadingQuotes ? 'Consultando...' : 'Atualizar Padrões'}
+              <RefreshCw className={`h-4 w-4 ${loadingQuotes ? 'animate-spin text-zinc-500' : 'text-black'}`} />
+              {loadingQuotes ? 'Buscando cotações...' : 'Buscar Todas as Cotações'}
             </button>
-          </div>
-
-          {/* Interactive Search Box - compact */}
-          <div className="p-2.5 bg-[#151917] border border-[#232B27] rounded-xl">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                value={searchQueryInput}
-                onChange={(e) => setSearchQueryInput(e.target.value)}
-                placeholder="🔍 Buscar: PLA 1kg, Bico E3D, Resina..."
-                className="w-full flex-grow bg-[#0C0E0D] border border-[#232B27] px-3 py-2 rounded-lg text-xs text-white placeholder-zinc-500 hover:border-[#38463F] focus:border-amber-500 outline-none font-sans"
-                id="shopping-search-input-field"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchQueryInput.trim()) {
-                    fetchLiveQuotes(false, searchQueryInput.trim());
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (searchQueryInput.trim()) {
-                    fetchLiveQuotes(false, searchQueryInput.trim());
-                  } else {
-                    triggerFeedback('Digite um termo para pesquisar!', 'info');
-                  }
-                }}
-                disabled={loadingQuotes}
-                className="w-full sm:w-auto px-3 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-[#151917] disabled:text-zinc-500 text-black font-extrabold text-xs rounded-lg cursor-pointer transition active:scale-95 flex items-center justify-center gap-1.5 select-none border border-amber-500"
-              >
-                <Search className="h-3.5 w-3.5" />
-                Buscar
-              </button>
-            </div>
           </div>
 
           {/* Pricing Config Form */}
@@ -5269,8 +5243,8 @@ Utilize a nossa nova calculadora de formação de preço de produtos para obter 
                     </a>
                   </div>
 
-                  <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 gap-1">
-                    {[...materialGroup.offers].sort((a, b) => a.price - b.price).map((offer: any, oIdx) => {
+                  <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-2.5">
+                    {[...materialGroup.offers].slice(0, 5).sort((a, b) => a.price - b.price).map((offer: any, oIdx) => {
                       const isHotOpportunity = offer.price < alertLimit;
                       const sales = offer.reviews || 0;
                       const feature = offer.feature || offer.storeName || '';

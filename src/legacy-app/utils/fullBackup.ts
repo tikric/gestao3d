@@ -174,6 +174,21 @@ async function blobToCatalogFile(model: ModelRecord, blob: Blob): Promise<Catalo
 
 export async function createCompleteBackup(extraData: Record<string, unknown> = {}): Promise<CompleteBackup> {
   const storage = readAllLocalStorage();
+
+  // Extract business states from local storage so that we ALWAYS have them at the root
+  // for legacy compatibility, ensuring auto-backups and manual backups are identical in schema/size
+  const legacyData: Record<string, any> = {};
+  for (const [storageKey, jsonKey] of LEGACY_STORAGE_PAIRS) {
+    const rawVal = storage[storageKey];
+    if (rawVal !== undefined && rawVal !== null) {
+      try {
+        legacyData[jsonKey] = JSON.parse(rawVal);
+      } catch {
+        legacyData[jsonKey] = rawVal;
+      }
+    }
+  }
+
   const { listModels, getFile } = await import("@/lib/catalog-db");
   const models = await listModels();
   const files: CatalogFileBackup[] = [];
@@ -207,6 +222,7 @@ export async function createCompleteBackup(extraData: Record<string, unknown> = 
     backupFormat: "gestao3d-complete-vault-v1",
     timestamp: Date.now(),
     exportedAt: new Date().toISOString(),
+    ...legacyData,
     ...extraData,
     storage,
     localStorage: storage,
@@ -227,6 +243,80 @@ export async function createCompleteBackup(extraData: Record<string, unknown> = 
   backup.integrity.checksum = checksum;
   backup.integrity.checksumAlgo = "sha-256";
   return backup;
+}
+
+export interface UnifiedBackupResult {
+  fileName: string;
+  savedLocally: boolean;
+  dbxOk: boolean;
+  gdOk: boolean;
+  data: CompleteBackup;
+}
+
+export async function executeUnifiedBackup(options: {
+  isManual?: boolean;
+  extraData?: Record<string, unknown>;
+} = {}): Promise<UnifiedBackupResult> {
+  const isManual = options.isManual ?? false;
+  
+  // 1. Generate the identical complete backup
+  const data = await createCompleteBackup(options.extraData || {});
+  const json = JSON.stringify(data, null, 2);
+  
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const timeStr = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
+  const fileName = `imprimetrics_backup_${dateStr}_${timeStr}.json`;
+  
+  // 2. Import hooks/methods asynchronously to avoid circular dependency
+  const { loadHandle, writeToFolder, uploadToDropbox, uploadToGDrive } = await import("../hooks/useAutoBackup");
+  
+  let savedLocally = false;
+  let dbxOk = false;
+  let gdOk = false;
+  
+  // Try local folder
+  const handle = await loadHandle();
+  if (handle) {
+    savedLocally = await writeToFolder(handle, fileName, json);
+  }
+  
+  // Try cloud sync
+  dbxOk = await uploadToDropbox(fileName, json);
+  gdOk = await uploadToGDrive(fileName, json);
+  
+  // 3. Trigger user-facing download if it's manual OR if we need to fall back
+  if (isManual || (!savedLocally && !dbxOk && !gdOk)) {
+    let androidSaved = false;
+    const android = (window as any).AndroidInterface;
+    if (android && typeof android.saveFile === 'function') {
+      try {
+        android.saveFile(fileName, json, "application/json");
+        androidSaved = true;
+      } catch (androidErr: any) {
+        console.warn("Falha ao salvar via AndroidInterface, usando fallback do navegador:", androidErr);
+      }
+    }
+    
+    if (!androidSaved) {
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+  
+  return {
+    fileName,
+    savedLocally,
+    dbxOk,
+    gdOk,
+    data
+  };
 }
 
 function readBackupStorage(json: any): StorageDump | null {

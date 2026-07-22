@@ -29,7 +29,7 @@ export function setGDriveConfig(enabled: boolean, folder: string) {
     localStorage.setItem(GDRIVE_FOLDER_KEY, (folder || 'Imprimetrics').trim());
   } catch {}
 }
-async function uploadToGDrive(fileName: string, content: string): Promise<boolean> {
+export async function uploadToGDrive(fileName: string, content: string): Promise<boolean> {
   const { enabled, folder } = getGDriveConfig();
   if (!enabled) return false;
   try {
@@ -157,7 +157,7 @@ async function getActiveDropboxToken(): Promise<string> {
   return token;
 }
 
-async function uploadToDropbox(fileName: string, content: string): Promise<boolean> {
+export async function uploadToDropbox(fileName: string, content: string): Promise<boolean> {
   const token = await getActiveDropboxToken();
   const { folder } = getDropboxConfig();
   if (!token) return false;
@@ -220,7 +220,7 @@ async function saveHandle(h: any) {
     tx.oncomplete = () => res(null); tx.onerror = () => rej(tx.error);
   });
 }
-async function loadHandle(): Promise<any | null> {
+export async function loadHandle(): Promise<any | null> {
   try {
     const db = await idb();
     return await new Promise((res, rej) => {
@@ -274,19 +274,7 @@ async function collectBackup() {
   return createCompleteBackup({ autoBackup: true });
 }
 
-function downloadJson(obj: any, fileName: string) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function writeToFolder(handle: any, fileName: string, content: string): Promise<boolean> {
+export async function writeToFolder(handle: any, fileName: string, content: string): Promise<boolean> {
   try {
     if (!(await ensurePermission(handle))) return false;
     const fh = await handle.getFileHandle(fileName, { create: true });
@@ -295,24 +283,21 @@ async function writeToFolder(handle: any, fileName: string, content: string): Pr
     await w.close();
     return true;
   } catch (e) {
-    console.warn('Falha ao gravar backup na pasta escolhida, usando download:', e);
+    console.warn('Falha ao gravar backup na pasta escolhida:', e);
     return false;
   }
 }
 
-export async function runBackupNow() {
-  const data = await collectBackup();
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const timeStr = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
-  const fileName = `imprimetrics_backup_${dateStr}_${timeStr}.json`;
-  const json = JSON.stringify(data, null, 2);
-  const handle = await loadHandle();
-  let saved = false;
-  if (handle) saved = await writeToFolder(handle, fileName, json);
-  const dbxOk = await uploadToDropbox(fileName, json);
-  const gdOk = await uploadToGDrive(fileName, json);
-  if (!saved && !dbxOk && !gdOk) downloadJson(data, fileName);
-  try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch {}
+export async function runBackupNow(isManual = false) {
+  const { executeUnifiedBackup } = await import('../utils/fullBackup');
+  try {
+    const result = await executeUnifiedBackup({ isManual, extraData: { autoBackup: true } });
+    localStorage.setItem(LAST_KEY, String(Date.now()));
+    return result;
+  } catch (e) {
+    console.warn('Falha no backup unificado:', e);
+    throw e;
+  }
 }
 
 export function useAutoBackup() {
@@ -322,7 +307,7 @@ export function useAutoBackup() {
       try {
         const last = Number(localStorage.getItem(LAST_KEY) || '0');
         if (!last || Date.now() - last >= INTERVAL_MS) {
-          await runBackupNow();
+          await runBackupNow(false);
         }
       } catch {}
     };

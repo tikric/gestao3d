@@ -649,6 +649,136 @@ export default function App() {
   // Backup automático do banco de dados a cada 6 horas (download no PC)
   useAutoBackup();
 
+  // Histórico de Pontos de Restauro Automáticos
+  const [rollbackHistory, setRollbackHistory] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('bambuzau_rollback_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const getSnapshotObject = () => ({
+    clients: clients || [],
+    printers: printers || [],
+    orders: orders || [],
+    filamentStocks: filamentStocks || [],
+    expenses: expenses || [],
+    shoppingItems: shoppingItems || [],
+    tuyaDevices: tuyaDevices || [],
+    suppliesStocks: suppliesStocks || [],
+    brandConfig: brandConfig || {}
+  });
+
+  useEffect(() => {
+    const currentSnap = getSnapshotObject();
+    const currentSnapStr = JSON.stringify(currentSnap);
+    
+    const lastHistoryItem = rollbackHistory[rollbackHistory.length - 1];
+    const lastHistoryStr = lastHistoryItem ? JSON.stringify(lastHistoryItem.data) : '';
+    
+    if (currentSnapStr === lastHistoryStr) {
+      return;
+    }
+    
+    const hasAnyData = (clients && clients.length > 0) || (orders && orders.length > 0) || (filamentStocks && filamentStocks.length > 0);
+    if (!hasAnyData) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setRollbackHistory(prev => {
+        const maxNum = prev.length > 0 ? Math.max(...prev.map(p => p.id || 0)) : 0;
+        const nextId = maxNum + 1;
+        
+        const descParts = [];
+        if (clients?.length) descParts.push(`${clients.length} Cli`);
+        if (orders?.length) descParts.push(`${orders.length} Ped`);
+        if (filamentStocks?.length) descParts.push(`${filamentStocks.length} Ins`);
+        const descSummary = descParts.length > 0 ? ` (${descParts.join(', ')})` : '';
+
+        const newPoint = {
+          id: nextId,
+          timestamp: Date.now(),
+          description: `Alteração Automática Nº ${nextId}${descSummary}`,
+          data: currentSnap
+        };
+        
+        const updated = [...prev, newPoint].slice(-15);
+        localStorage.setItem('bambuzau_rollback_history', JSON.stringify(updated));
+        return updated;
+      });
+    }, 4000);
+    
+    return () => clearTimeout(timer);
+  }, [clients, printers, orders, filamentStocks, expenses, shoppingItems, tuyaDevices, suppliesStocks, brandConfig]);
+
+  const handleCreateManualRestorePoint = (customDesc?: string) => {
+    const currentSnap = getSnapshotObject();
+    setRollbackHistory(prev => {
+      const maxNum = prev.length > 0 ? Math.max(...prev.map(p => p.id || 0)) : 0;
+      const nextId = maxNum + 1;
+      
+      const descParts = [];
+      if (clients?.length) descParts.push(`${clients.length} Clientes`);
+      if (orders?.length) descParts.push(`${orders.length} Pedidos`);
+      const descSummary = descParts.length > 0 ? ` [${descParts.join(', ')}]` : '';
+
+      const newPoint = {
+        id: nextId,
+        timestamp: Date.now(),
+        description: customDesc || `Ponto Manual Nº ${nextId}${descSummary}`,
+        data: currentSnap
+      };
+      
+      const updated = [...prev, newPoint].slice(-15);
+      localStorage.setItem('bambuzau_rollback_history', JSON.stringify(updated));
+      return updated;
+    });
+    setGlobalToast(`✓ Ponto de Restauro Manual criado!`);
+    setTimeout(() => setGlobalToast(null), 4000);
+  };
+
+  const handleRestoreFromHistoryPoint = (pointId: number) => {
+    const point = rollbackHistory.find(p => p.id === pointId);
+    if (!point) return;
+    
+    // Backup the current state in case they want to undo
+    const currentSnap = getSnapshotObject();
+    localStorage.setItem('bambuzau_rollback_snapshot', JSON.stringify({
+      timestamp: Date.now(),
+      description: 'Snapshot temporário antes de reverter',
+      data: currentSnap
+    }));
+    
+    const d = point.data;
+    if (d.clients) setClients(d.clients);
+    if (d.printers) setPrinters(d.printers);
+    if (d.orders) setOrders(d.orders);
+    if (d.filamentStocks) setFilamentStocks(d.filamentStocks);
+    if (d.expenses) setExpenses(d.expenses);
+    if (d.shoppingItems) setShoppingItems(d.shoppingItems);
+    if (d.tuyaDevices) setTuyaDevices(d.tuyaDevices);
+    if (d.suppliesStocks) setSuppliesStocks(d.suppliesStocks);
+    if (d.brandConfig) setBrandConfig(d.brandConfig);
+    
+    setGlobalToast(`✓ Sistema restaurado para o Ponto Nº ${pointId}!`);
+    setTimeout(() => {
+      setGlobalToast(null);
+      window.location.reload();
+    }, 1500);
+  };
+
+  const handleClearHistory = () => {
+    if (confirm('Deseja realmente limpar todo o histórico de pontos de restauro automáticos?')) {
+      setRollbackHistory([]);
+      localStorage.removeItem('bambuzau_rollback_history');
+      setGlobalToast('✓ Histórico de pontos de restauro limpo!');
+      setTimeout(() => setGlobalToast(null), 3000);
+    }
+  };
+
 
   // Force scroll-to-top on window whenever the main tab selection changes
   useEffect(() => {
@@ -2134,6 +2264,10 @@ export default function App() {
             onUpdateBrandConfig={setBrandConfig}
             tuyaDevices={tuyaDevices}
             onUpdateTuyaDevices={setTuyaDevices}
+            rollbackHistory={rollbackHistory}
+            onCreateManualRestorePoint={handleCreateManualRestorePoint}
+            onRestoreFromHistoryPoint={handleRestoreFromHistoryPoint}
+            onClearHistory={handleClearHistory}
           />
         )}
 

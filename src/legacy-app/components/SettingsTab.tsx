@@ -328,6 +328,10 @@ interface SettingsTabProps {
   onUpdateBrandConfig: (config: any) => void;
   tuyaDevices?: any[];
   onUpdateTuyaDevices?: (devices: any[]) => void;
+  rollbackHistory?: any[];
+  onCreateManualRestorePoint?: (desc?: string) => void;
+  onRestoreFromHistoryPoint?: (pointId: number) => void;
+  onClearHistory?: () => void;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -341,7 +345,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   brandConfig,
   onUpdateBrandConfig,
   tuyaDevices = [],
-  onUpdateTuyaDevices
+  onUpdateTuyaDevices,
+  rollbackHistory = [],
+  onCreateManualRestorePoint,
+  onRestoreFromHistoryPoint,
+  onClearHistory
 }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -922,8 +930,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // 1. Export Data to JSON
   const handleExportData = async () => {
     try {
-      const exportObject = await createCompleteBackup({
-        // In-memory React state (kept for backward compat with older restores)
+      const extraData = {
         clients: clients || [],
         printers: printers || [],
         orders: orders || [],
@@ -935,39 +942,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           try { return JSON.parse(localStorage.getItem('bambuzau_local_catalog_production') || '[]'); }
           catch { return []; }
         })(),
-      });
+      };
 
-      const jsonBackupText = JSON.stringify(exportObject, null, 2);
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const timeStr = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
-      const fileName = `imprimetrics_backup_${dateStr}_${timeStr}.json`;
+      const { executeUnifiedBackup } = await import('../utils/fullBackup');
+      const result = await executeUnifiedBackup({ isManual: true, extraData });
 
-      let androidSaved = false;
-      const android = (window as any).AndroidInterface;
-      if (android && typeof android.saveFile === 'function') {
-        try {
-          android.saveFile(fileName, jsonBackupText, "application/json");
-          androidSaved = true;
-        } catch (androidErr: any) {
-          console.warn("Falha ao salvar via AndroidInterface, usando fallback do navegador:", androidErr);
-        }
+      const countKeys = result.data.integrity.localStorageKeys;
+      const countModels = result.data.integrity.catalogModels;
+      const countFiles = result.data.integrity.catalogFiles;
+
+      let msg = 'Backup completo baixado com sucesso!';
+      if (result.savedLocally) msg = 'Backup completo gravado na pasta local!';
+      else if (result.dbxOk || result.gdOk) {
+        msg = 'Backup completo enviado para a Nuvem!';
       }
 
-      if (!androidSaved) {
-        // Safe, high-performance Blob download to prevent URI too large crashes on large databases
-        const blob = new Blob([jsonBackupText], { type: "application/json" });
-        const downloadUrl = URL.createObjectURL(blob);
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", downloadUrl);
-        downloadAnchor.setAttribute("download", fileName);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-        // Free browser memory
-        URL.revokeObjectURL(downloadUrl);
-      }
-
-      showSuccess(`Backup completo baixado: ${exportObject.integrity.localStorageKeys} chaves + ${exportObject.integrity.catalogFiles}/${exportObject.integrity.catalogModels} STL/3MF do Vault.`);
+      showSuccess(`${msg} (${countKeys} chaves + ${countFiles}/${countModels} STL/3MF do Vault).`);
     } catch (err: any) {
       showError('Ocorreu um erro ao exportar os dados: ' + err.message);
     }
@@ -1008,19 +998,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // 1b. Export Backup to Clipboard (Text representation fallback for WebViews)
   const handleExportToClipboard = async () => {
     try {
-      const exportObject = await createCompleteBackup({
-        clients: clients || [],
-        printers: printers || [],
-        orders: orders || [],
-        filamentStocks: filamentStocks || [],
-        expenses: expenses || [],
-        shoppingItems: shoppingItems || [],
-        brandConfig: brandConfig || {},
-        catalogItems: (() => {
-          try { return JSON.parse(localStorage.getItem('bambuzau_local_catalog_production') || '[]'); }
-          catch { return []; }
-        })(),
-      });
+      const exportObject = await createCompleteBackup();
 
       const jsonString = JSON.stringify(exportObject, null, 2);
 
@@ -2179,6 +2157,106 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
            <DropboxOAuthControl />
            <GDriveBackupControl />
            <TelegramStlControl />
+
+            {/* Histórico de Alterações & Pontos de Restauro Automáticos */}
+            <div className="mt-4 pt-4 border-t border-[#232B27]/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-amber-500" />
+                  Histórico de Alterações & Restauro Automático
+                </h4>
+                {rollbackHistory && rollbackHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={onClearHistory}
+                    className="text-[10px] text-red-400/80 hover:text-red-400 flex items-center gap-1 bg-red-950/20 hover:bg-red-950/40 px-2.5 py-1 rounded-lg border border-red-500/10 transition cursor-pointer font-bold"
+                  >
+                    <Trash className="h-3 w-3" />
+                    Limpar Histórico
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[10px] text-[#8BA58D] leading-relaxed">
+                Cada atualização feita no painel (pedidos, estoque, clientes, etc) gera um ponto de restauro numerado automaticamente. Caso cometa um erro ou queira revogar as alterações recentes, escolha um ponto abaixo e reverteremos instantaneamente.
+              </p>
+
+              {/* Manual snapshot trigger */}
+              <div className="flex gap-2 bg-[#0C0E0D] border border-[#232B27]/40 p-2.5 rounded-xl">
+                <input
+                  type="text"
+                  id="manual_restore_desc"
+                  placeholder="Descrição opcional do ponto (Ex: Antes de limpar)"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-[#111613] border border-[#2F3D35] text-[#F1F4EE] text-[11px]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = e.currentTarget.value;
+                      if (onCreateManualRestorePoint) onCreateManualRestorePoint(val);
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const input = document.getElementById('manual_restore_desc') as HTMLInputElement;
+                    if (onCreateManualRestorePoint) onCreateManualRestorePoint(input?.value || undefined);
+                    if (input) input.value = '';
+                  }}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black text-[11px] font-bold rounded-lg transition shrink-0 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 text-black" />
+                  Salvar Ponto
+                </button>
+              </div>
+
+              {/* List of restore points */}
+              <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
+                {rollbackHistory && rollbackHistory.length > 0 ? (
+                  [...rollbackHistory].reverse().map((point: any) => {
+                    const date = new Date(point.timestamp);
+                    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const dateStr = date.toLocaleDateString('pt-BR');
+                    return (
+                      <div
+                        key={point.id}
+                        className="p-2.5 rounded-xl bg-[#0C0E0D] border border-[#232B27]/60 hover:border-amber-500/20 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                      >
+                        <div className="space-y-0.5 text-left">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black font-mono bg-amber-400 text-black px-1.5 py-0.2 rounded">
+                              Nº {point.id}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              {dateStr} às {timeStr}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-[#F1F4EE] font-medium leading-tight">
+                            {point.description}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Deseja reverter todas as tabelas do painel para o Ponto Nº ${point.id}? (Seu estado atual será salvo como precaução)`)) {
+                              if (onRestoreFromHistoryPoint) onRestoreFromHistoryPoint(point.id);
+                            }
+                          }}
+                          className="w-full sm:w-auto px-3 py-1.5 bg-[#1C2420] hover:bg-amber-400 hover:text-black border border-[#2F3D35] hover:border-amber-400 text-zinc-300 hover:text-black rounded-lg text-[10px] font-black uppercase transition shrink-0 flex items-center justify-center gap-1 select-none cursor-pointer"
+                        >
+                          <RotateCcw className="h-3 w-3 shrink-0" />
+                          Reverter para este ponto
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-6 text-center text-[11px] text-zinc-500 border border-dashed border-[#232B27] rounded-xl">
+                    Nenhum ponto de restauro criado ainda. Faça alterações no painel para salvar pontos automáticos!
+                  </div>
+                )}
+              </div>
+            </div>
 
             {showClipboardBackup && (
               <div className="mt-3 bg-[#0C0E0D] border border-purple-500/10 p-3.5 rounded-xl space-y-3 animate-fade-in">
