@@ -15,6 +15,29 @@ export interface VersionEntry {
 
 export const VERSION_HISTORY: VersionEntry[] = [
   {
+    version: "3.0.0.0.7",
+    date: "2026-07-21",
+    changes: [
+      "Agenda reformulada com SLA automático: 1 Dia (pedidos normais) e 5 Dias (pedidos personalizados)",
+      "Alertas visuais e destaque de pedidos em atraso com contador de dias",
+      "Lote de expedição diária às 09:00h com botão de despacho em lote",
+      "Integração completa de notificações e disparo de eventos via Webhook do OpenCode Engine",
+    ],
+  },
+  {
+    version: "3.0.0.0.6",
+    date: "2026-07-21",
+    changes: ["Inclusão do favicon oficial e identidade visual da Gestão 3D nos metadados"],
+  },
+  {
+    version: "3.0.0.0.5",
+    date: "2026-07-21",
+    changes: [
+      "Checklist interativo de manutenção preventiva com status em tempo real",
+      "Correções de chaves e renderização na Agenda e tabelas do sistema",
+    ],
+  },
+  {
     version: "3.0.0.0.4",
     date: "2026-07-11",
     changes: [
