@@ -32,7 +32,9 @@ import {
   Bell,
   ArrowRight,
   Check,
-  X
+  X,
+  Download,
+  Upload
 } from "lucide-react";
 
 type SendState = "idle" | "sending" | "ok" | "err";
@@ -438,6 +440,75 @@ function AgendaPage() {
     }
   };
 
+  const [syncingNotion, setSyncingNotion] = useState(false);
+
+  const exportToJSON = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      events,
+      orders,
+      expenses,
+      shopping,
+      catalog,
+      derivedByDate: Object.fromEntries(derivedByDate),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gestao3d_agenda_export_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const syncToNotion = async () => {
+    setSyncingNotion(true);
+    try {
+      const payload = {
+        events: events.map((e) => ({
+          nome: e.title,
+          data_iso: e.date,
+          hora: e.time || null,
+          tipo: "👤 Pessoal",
+          origem: "Gestão3D",
+          descricao: e.notes || "",
+        })),
+        orders: orders.map((o) => ({
+          nome: `${o.itemName || "Pedido"} x${o.quantity || 1}`,
+          data_iso: o.deadline ? fmtTs(o.deadline) : "",
+          tipo: o.status === "DELIVERED" ? "🚚 Entrega" : "📦 Pedido",
+          origem: "Gestão3D",
+          valor: o.priceCharged,
+          descricao: o.clientName || "",
+          link: typeof window !== "undefined" ? window.location.href : "",
+        })),
+        expenses: expenses.map((e) => ({
+          nome: e.description || "Despesa",
+          data_iso: e.date ? fmtTs(e.date) : "",
+          tipo: "🛒 Comprar",
+          origem: "Gestão3D",
+          valor: e.amount,
+        })),
+      };
+      const resp = await fetch("/api/notion-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        const resData = await resp.json().catch(() => ({}));
+        alert(`✓ Sincronizado com Notion! (${resData.created ?? 0} itens processados)`);
+      } else {
+        const err = await resp.text();
+        alert(`✗ Erro na sincronização: ${err}`);
+      }
+    } catch (e: any) {
+      alert(`✗ Erro de conexão: ${e?.message || e}`);
+    } finally {
+      setSyncingNotion(false);
+    }
+  };
+
   // Form submit for adding manual event
   const addEvent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -520,6 +591,25 @@ function AgendaPage() {
             >
               <Zap className="h-3.5 w-3.5 text-[#b7ff00]" />
               {cfg.url ? "OpenCode Conectado" : "Conectar OpenCode Engine"}
+            </button>
+
+            <button
+              onClick={exportToJSON}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/70 transition-all hover:bg-white/10 hover:text-white"
+              title="Baixar backup da agenda em formato JSON"
+            >
+              <Download className="h-3.5 w-3.5 text-cyan-400" />
+              Export JSON
+            </button>
+
+            <button
+              onClick={syncToNotion}
+              disabled={syncingNotion}
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-2 text-xs font-semibold text-emerald-200 transition-all hover:bg-emerald-500/20 disabled:opacity-50"
+              title="Sincronizar eventos e pedidos com a Agenda Central do Notion"
+            >
+              <Upload className={`h-3.5 w-3.5 ${syncingNotion ? "animate-spin text-emerald-300" : "text-emerald-400"}`} />
+              {syncingNotion ? "Sincronizando..." : "Sync Notion"}
             </button>
           </div>
         </header>

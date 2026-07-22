@@ -15,6 +15,15 @@ export interface VersionEntry {
 
 export const VERSION_HISTORY: VersionEntry[] = [
   {
+    version: "3.0.0.0.8",
+    date: "2026-07-21",
+    changes: [
+      "Integração da Agenda Unificada com o Notion (Sincronização de pedidos, eventos e despesas)",
+      "Botões 'Export JSON' e 'Sync Notion' na interface da AgendaTab",
+      "Rota de API server-side '/api/notion-sync' para persistência na Agenda Central do Notion",
+    ],
+  },
+  {
     version: "3.0.0.0.7",
     date: "2026-07-21",
     changes: [
