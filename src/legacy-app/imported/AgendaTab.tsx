@@ -47,16 +47,20 @@ export type Event = {
   category?: "DELIVERY_BATCH" | "NORMAL_ORDER" | "CUSTOM_ORDER" | "MAINTENANCE" | "SHOPPING" | "EVENT";
   notes?: string;
   orderId?: number;
+  hermesSentAt?: number;
+  hermesStatus?: SendState;
+  hermesError?: string;
   opencodeSentAt?: number;
   opencodeStatus?: SendState;
   opencodeError?: string;
 };
 
 const STORAGE_KEY = "agenda-events-v1";
+const HERMES_CFG_KEY = "agenda-hermes-cfg-v1";
 const OPENCODE_CFG_KEY = "agenda-opencode-cfg-v1";
 
-type OpenCodeCfg = { url: string; secret: string; auto: boolean };
-const DEFAULT_CFG: OpenCodeCfg = { url: "", secret: "", auto: false };
+type HermesCfg = { url: string; secret: string; auto: boolean };
+const DEFAULT_CFG: HermesCfg = { url: "", secret: "", auto: false };
 
 function fmt(d: Date) {
   const y = d.getFullYear();
@@ -130,9 +134,9 @@ type DerivedItem = {
   slaDays?: number;
 };
 
-// OpenCode Webhook Dispatch
-async function sendToOpenCode(cfg: OpenCodeCfg, payload: any) {
-  if (!cfg.url) throw new Error("Webhook do OpenCode não configurado");
+// Hermes Webhook Dispatch
+async function sendToHermes(cfg: HermesCfg, payload: any) {
+  if (!cfg.url) throw new Error("Webhook do Hermes não configurado");
   const res = await fetch(cfg.url, {
     method: "POST",
     headers: {
@@ -140,7 +144,7 @@ async function sendToOpenCode(cfg: OpenCodeCfg, payload: any) {
       ...(cfg.secret ? { Authorization: `Bearer ${cfg.secret}` } : {}),
     },
     body: JSON.stringify({
-      source: "opencode-agenda-gestao3d",
+      source: "hermes-agenda-gestao3d",
       timestamp: new Date().toISOString(),
       ...payload,
     }),
@@ -157,7 +161,7 @@ function AgendaPage() {
   const [time, setTime] = useState("09:00");
   const [category, setCategory] = useState<Event["category"]>("EVENT");
   const [notes, setNotes] = useState("");
-  const [cfg, setCfg] = useState<OpenCodeCfg>(DEFAULT_CFG);
+  const [cfg, setCfg] = useState<HermesCfg>(DEFAULT_CFG);
   const [showCfg, setShowCfg] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"ALL" | "OVERDUE" | "NORMAL" | "CUSTOM" | "BATCH" | "MAINTENANCE" | "SHOPPING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,7 +188,7 @@ function AgendaPage() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setEvents(JSON.parse(raw));
-      const rawCfg = localStorage.getItem(OPENCODE_CFG_KEY);
+      const rawCfg = localStorage.getItem(HERMES_CFG_KEY) || localStorage.getItem(OPENCODE_CFG_KEY);
       if (rawCfg) setCfg({ ...DEFAULT_CFG, ...JSON.parse(rawCfg) });
     } catch {}
 
@@ -212,7 +216,10 @@ function AgendaPage() {
   }, [events, mounted]);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem(OPENCODE_CFG_KEY, JSON.stringify(cfg));
+    if (mounted) {
+      localStorage.setItem(HERMES_CFG_KEY, JSON.stringify(cfg));
+      localStorage.setItem(OPENCODE_CFG_KEY, JSON.stringify(cfg));
+    }
   }, [cfg, mounted]);
 
   // Calendar cells
@@ -416,9 +423,9 @@ function AgendaPage() {
     setOrders(updated);
     localStorage.setItem("bambuzau_orders", JSON.stringify(updated));
 
-    // Send OpenCode notification if enabled
+    // Send Hermes notification if enabled
     if (cfg.url) {
-      void sendToOpenCode(cfg, {
+      void sendToHermes(cfg, {
         action: "BATCH_DISPATCH_09AM",
         date: dateStr,
         time: "09:00",
@@ -430,13 +437,13 @@ function AgendaPage() {
     alert(`🚀 Lote de 09:00h despachado com sucesso! ${pendingOrderIds.length} pedido(s) marcados como Entregues.`);
   };
 
-  // OpenCode dispatch for single event or order
-  const handleOpenCodeDispatch = async (payload: any) => {
+  // Hermes dispatch for single event or order
+  const handleHermesDispatch = async (payload: any) => {
     try {
-      await sendToOpenCode(cfg, payload);
-      alert("⚡ Evento enviado com sucesso para a API do OpenCode!");
+      await sendToHermes(cfg, payload);
+      alert("⚡ Evento enviado com sucesso para a API do Hermes!");
     } catch (err: any) {
-      alert(`Erro ao enviar ao OpenCode: ${err?.message || "Falha de conexão"}`);
+      alert(`Erro ao enviar ao Hermes: ${err?.message || "Falha de conexão"}`);
     }
   };
 
@@ -526,7 +533,7 @@ function AgendaPage() {
     setNotes("");
 
     if (cfg.auto && cfg.url) {
-      void handleOpenCodeDispatch({ event: ev });
+      void handleHermesDispatch({ event: ev });
     }
   };
 
@@ -559,7 +566,7 @@ function AgendaPage() {
         <header className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-[#b7ff00]">
-              <Sparkles className="w-4 h-4 text-[#b7ff00]" /> OpenCode Smart Calendar Engine
+              <Sparkles className="w-4 h-4 text-[#b7ff00]" /> Hermes Smart Calendar Engine
             </div>
             <h1
               className="text-3xl font-light tracking-tight text-white md:text-4xl"
@@ -590,7 +597,7 @@ function AgendaPage() {
               }`}
             >
               <Zap className="h-3.5 w-3.5 text-[#b7ff00]" />
-              {cfg.url ? "OpenCode Conectado" : "Conectar OpenCode Engine"}
+              {cfg.url ? "Hermes Conectado" : "Conectar Hermes Engine"}
             </button>
 
             <button
@@ -654,14 +661,14 @@ function AgendaPage() {
           </div>
         )}
 
-        {/* OpenCode Config Panel */}
+        {/* Hermes Config Panel */}
         {showCfg && (
           <div className="mb-6 rounded-2xl border border-[#b7ff00]/30 bg-black/80 p-5 backdrop-blur-xl">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-[#b7ff00]" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-white">
-                  Integração Webhook do OpenCode Engine
+                  Integração Webhook do Hermes Engine
                 </span>
               </div>
               <button onClick={() => setShowCfg(false)} className="text-white/40 hover:text-white">
@@ -670,11 +677,11 @@ function AgendaPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block text-xs">
-                <span className="text-white/60">URL do Webhook OpenCode</span>
+                <span className="text-white/60">URL do Webhook Hermes</span>
                 <input
                   value={cfg.url}
                   onChange={(e) => setCfg((c) => ({ ...c, url: e.target.value }))}
-                  placeholder="https://opencode.ai/api/webhooks/agenda-3d"
+                  placeholder="https://hermes.ai/api/webhooks/agenda-3d"
                   className="mt-1 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-[#b7ff00] focus:outline-none"
                 />
               </label>
@@ -700,11 +707,11 @@ function AgendaPage() {
                 Disparar eventos automaticamente ao criar compromissos
               </label>
               <button
-                onClick={() => handleOpenCodeDispatch({ ping: true, message: "Teste de conexão OpenCode" })}
+                onClick={() => handleHermesDispatch({ ping: true, message: "Teste de conexão Hermes Engine" })}
                 disabled={!cfg.url}
                 className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs hover:bg-white/20 disabled:opacity-40"
               >
-                Testar Webhook OpenCode
+                Testar Webhook Hermes
               </button>
             </div>
           </div>
@@ -1011,9 +1018,9 @@ function AgendaPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleOpenCodeDispatch({ event: ev })}
+                            onClick={() => handleHermesDispatch({ event: ev })}
                             className="p-1.5 rounded bg-white/10 text-white/70 hover:text-white"
-                            title="Enviar ao OpenCode"
+                            title="Enviar ao Hermes"
                           >
                             <Send className="w-3.5 h-3.5" />
                           </button>

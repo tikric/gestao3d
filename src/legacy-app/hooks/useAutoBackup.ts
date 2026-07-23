@@ -289,13 +289,18 @@ export async function writeToFolder(handle: any, fileName: string, content: stri
 }
 
 export async function runBackupNow(isManual = false) {
-  const { executeUnifiedBackup } = await import('../utils/fullBackup');
+  const { executeUnifiedBackup, validateBackupIntegrity } = await import('../utils/fullBackup');
   try {
     const result = await executeUnifiedBackup({ isManual, extraData: { autoBackup: true } });
+    if (!result || !result.data) {
+      throw new Error('Falha na geração do backup: dados ausentes ou nulos.');
+    }
+    // Garante que a estrutura final do backup passou pela verificação de integridade
+    await validateBackupIntegrity(result.data);
     localStorage.setItem(LAST_KEY, String(Date.now()));
     return result;
   } catch (e) {
-    console.warn('Falha no backup unificado:', e);
+    console.warn('Falha e aborto no backup por erro de integridade ou execução:', e);
     throw e;
   }
 }
@@ -309,7 +314,9 @@ export function useAutoBackup() {
         if (!last || Date.now() - last >= INTERVAL_MS) {
           await runBackupNow(false);
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Backup automático cancelado para evitar salvar arquivo corrompido:', err);
+      }
     };
     // first check shortly after mount (avoids blocking initial render)
     const initial = setTimeout(tick, 30_000);

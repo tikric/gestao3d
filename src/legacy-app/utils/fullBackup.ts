@@ -261,7 +261,14 @@ export async function executeUnifiedBackup(options: {
   
   // 1. Generate the identical complete backup
   const data = await createCompleteBackup(options.extraData || {});
+
+  // 1b. Strict data integrity verification BEFORE saving or triggering download
+  await validateBackupIntegrity(data);
+
   const json = JSON.stringify(data, null, 2);
+  if (!json || json.trim().length < 50) {
+    throw new BackupIntegrityError(["Conteúdo gerado do backup está vazio ou corrompido."]);
+  }
   
   const dateStr = new Date().toISOString().slice(0, 10);
   const timeStr = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');

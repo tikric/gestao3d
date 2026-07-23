@@ -1489,3 +1489,40 @@ html[data-costs-subtab="CALC"] [data-tab-category="estoque"] #view-page-header {
     background-position: -200% 0;
   }
 }
+
+/* Accessibility Focus-Visible Ring (WCAG 2.4.7 Focus Visible) */
+:focus-visible {
+  outline: 2px solid #b7ff00 !important;
+  outline-offset: 2px !important;
+}
+
+/* Accessibility Screen Reader Only Utility (WCAG 1.3.1) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Accessibility Prefers Reduced Motion (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pulse-border,
+  .tab-blink,
+  .nav-alert-blink,
+  .brand-shine {
+    animation: none !important;
+  }
+}

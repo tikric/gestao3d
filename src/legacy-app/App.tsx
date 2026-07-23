@@ -9,25 +9,9 @@ import { useAutoQuotations } from './hooks/useAutoQuotations';
 import { useAutoBackup, runBackupNow } from './hooks/useAutoBackup';
 if (typeof window !== 'undefined') (window as any).backupNow = runBackupNow;
 import { DashboardTab } from './components/DashboardTab';
-import { ProductionTab } from './components/ProductionTab';
-import { ClientsTab } from './components/ClientsTab';
-import { IntegrationTab } from './components/IntegrationTab';
-import { CostsTab } from './components/CostsTab';
-import { SettingsTab } from './components/SettingsTab';
-import { SoldTab } from './components/SoldTab';
-import { OkLojaAssistant } from './components/OkLojaAssistant';
-import { ShowcaseView } from './components/ShowcaseView';
-import { PrintFlowTab } from './components/PrintFlowTab';
-import { PrinterQueueList } from './components/PrinterQueueList';
-import { ManutencaoTab } from './components/ManutencaoTab';
-import { OrcamentosTab } from './components/OrcamentosTab';
-import { WhatsAppTab } from './components/WhatsAppTab';
-import {
-  PriceResearchTab, PreCheckTab, AgendaTab, ToolsTab, ModelsTab
-} from './components/NewTabs';
-import Market3DApp from '@/market3d/App';
+
 // Heavy tabs are code-split: only the chunk for the active tab is fetched.
-// Saves ~hundreds of KB on initial load (Market3D + 7 imported pages).
+// Saves ~hundreds of KB on initial load (Market3D + 15 secondary tabs).
 // Recover from stale chunk references after a redeploy: when the browser
 // holds an old HTML referencing chunks that no longer exist on the server,
 // the dynamic import 404s. We reload once to pick up the fresh chunks.
@@ -49,13 +33,28 @@ const lazyWithReload = <T extends React.ComponentType<any>>(
     })
   );
 
-const CatalogoTab     = lazyWithReload(() => import('./imported/CatalogoTab'));
-const MarketingTab    = lazyWithReload(() => import('./imported/MarketingTab'));
-const KanbanTab       = lazyWithReload(() => import('./imported/KanbanTab'));
-const MarketTab       = lazyWithReload(() => import('./imported/MarketTab'));
-const AgendaTabNew    = lazyWithReload(() => import('./imported/AgendaTab'));
-const SitesTab        = lazyWithReload(() => import('./imported/SitesTab'));
-const PreCheckTabNew  = lazyWithReload(() => import('./imported/PreCheckTab'));
+const ProductionTab    = lazyWithReload(() => import('./components/ProductionTab').then(m => ({ default: m.ProductionTab })));
+const ClientsTab       = lazyWithReload(() => import('./components/ClientsTab').then(m => ({ default: m.ClientsTab })));
+const IntegrationTab   = lazyWithReload(() => import('./components/IntegrationTab').then(m => ({ default: m.IntegrationTab })));
+const CostsTab         = lazyWithReload(() => import('./components/CostsTab').then(m => ({ default: m.CostsTab })));
+const SettingsTab      = lazyWithReload(() => import('./components/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const SoldTab          = lazyWithReload(() => import('./components/SoldTab').then(m => ({ default: m.SoldTab })));
+const OkLojaAssistant  = lazyWithReload(() => import('./components/OkLojaAssistant').then(m => ({ default: m.OkLojaAssistant })));
+const ShowcaseView     = lazyWithReload(() => import('./components/ShowcaseView').then(m => ({ default: m.ShowcaseView })));
+const PrintFlowTab     = lazyWithReload(() => import('./components/PrintFlowTab').then(m => ({ default: m.PrintFlowTab })));
+const PrinterQueueList = lazyWithReload(() => import('./components/PrinterQueueList').then(m => ({ default: m.PrinterQueueList })));
+const ManutencaoTab    = lazyWithReload(() => import('./components/ManutencaoTab').then(m => ({ default: m.ManutencaoTab })));
+const OrcamentosTab    = lazyWithReload(() => import('./components/OrcamentosTab').then(m => ({ default: m.OrcamentosTab })));
+const WhatsAppTab      = lazyWithReload(() => import('./components/WhatsAppTab').then(m => ({ default: m.WhatsAppTab })));
+
+const Market3DApp      = lazyWithReload(() => import('@/market3d/App'));
+const CatalogoTab      = lazyWithReload(() => import('./imported/CatalogoTab'));
+const MarketingTab     = lazyWithReload(() => import('./imported/MarketingTab'));
+const KanbanTab        = lazyWithReload(() => import('./imported/KanbanTab'));
+const MarketTab        = lazyWithReload(() => import('./imported/MarketTab'));
+const AgendaTabNew     = lazyWithReload(() => import('./imported/AgendaTab'));
+const SitesTab         = lazyWithReload(() => import('./imported/SitesTab'));
+const PreCheckTabNew   = lazyWithReload(() => import('./imported/PreCheckTab'));
 const ContabilidadeTab = lazyWithReload(() => import('./components/ContabilidadeTab'));
 
 const TabFallback = () => (
@@ -2104,7 +2103,7 @@ export default function App() {
       </>
 
       {/* TWO-PANEL CONTENT OR CENTRAL CONTAINER */}
-      <main className="flex-1 w-full px-3 sm:px-4 md:px-6 py-4 md:py-6 pb-28 space-y-4">
+      <main id="main-content" className="flex-1 w-full px-3 sm:px-4 md:px-6 py-4 md:py-6 pb-28 space-y-4">
         {/* EXQUISITE NEW HEADER DE CADA PÁGINA (Título grande + Subtítulo curto + Relógio/Data ao vivo mounted) */}
         {null /* Page titles removed — actions moved into each dashboard. */}
         {/* GLOBAL STOCK WARNING BANNER - PLACED ABOVE EVERYTHING ONLY IN PAINEL */}
@@ -2180,169 +2179,117 @@ export default function App() {
           />
         )}
 
-        {currentTab === 2 && (
-          <ClientsTab
-            clients={clients}
-            printers={printers}
-            orders={orders}
-            onAddClient={handleAddClient}
-            onUpdateClient={handleUpdateClient}
-            onDeleteClient={handleDeleteClient}
-            onAddPrinter={handleAddPrinter}
-            onUpdatePrinter={handleUpdatePrinter}
-            onDeletePrinter={handleDeletePrinter}
-            onAddOrder={handleAddOrder}
-            viewMode="clients"
-          />
-        )}
-
-        {currentTab !== 0 && currentTab !== 2 && (
-          <div className="p-0">
-        {currentTab === 1 && (
-          <>
-            <ProductionTab
-              orders={orders}
-              printers={printers}
-              filamentStocks={filamentStocks}
+        <Suspense fallback={<TabFallback />}>
+          {currentTab === 2 && (
+            <ClientsTab
               clients={clients}
-              onAddOrder={handleAddOrder}
-              onAddClient={handleAddClient}
-              onUpdateOrder={handleUpdateOrder}
-              onDeleteOrder={handleDeleteOrder}
-              onSimulateTick={handleSimulateTick}
-              onUpdateFilament={handleUpdateFilamentStock}
-              onUpdatePrinter={handleUpdatePrinter}
-              viewMode="orders"
-            />
-          </>
-        )}
-
-        {currentTab === 3 && (
-          <>
-            <IntegrationTab
-              onImportOrder={handleImportExternalOrder}
-              importedExternalIds={importedExternalIds}
+              printers={printers}
               orders={orders}
-              onUpdateOrder={handleUpdateOrder}
+              onAddClient={handleAddClient}
+              onUpdateClient={handleUpdateClient}
+              onDeleteClient={handleDeleteClient}
+              onAddPrinter={handleAddPrinter}
+              onUpdatePrinter={handleUpdatePrinter}
+              onDeletePrinter={handleDeletePrinter}
+              onAddOrder={handleAddOrder}
+              viewMode="clients"
             />
-          </>
-        )}
+          )}
 
-        {currentTab === 4 && (
-          <>
-            <CostsTab
-            filamentStocks={filamentStocks}
-            shoppingItems={shoppingItems}
-            expenses={expenses}
-            onAddFilament={handleAddFilamentStock}
-            onUpdateFilament={handleUpdateFilamentStock}
-            onAddShoppingItem={handleAddShoppingItem}
-            onToggleShoppingItem={handleToggleShoppingItem}
-            onDeleteShoppingItem={handleDeleteShoppingItem}
-            onDeleteFilament={handleDeleteFilamentStock}
-            onAddExpense={handleAddExpense}
-            onDeleteExpense={handleDeleteExpense}
-            onUpdateExpense={handleUpdateExpense}
-            suppliesStocks={suppliesStocks}
-            setSuppliesStocks={setSuppliesStocks}
-            lastAuditDate={lastAuditDate}
-            setLastAuditDate={setLastAuditDate}
-            />
-          </>
-        )}
-
-        {currentTab === 5 && (
-          <SettingsTab
-            clients={clients}
-            printers={printers}
-            orders={orders}
-            filamentStocks={filamentStocks}
-            expenses={expenses}
-            shoppingItems={shoppingItems}
-            onImportAllData={handleImportAllData}
-            brandConfig={brandConfig}
-            onUpdateBrandConfig={setBrandConfig}
-            tuyaDevices={tuyaDevices}
-            onUpdateTuyaDevices={setTuyaDevices}
-            rollbackHistory={rollbackHistory}
-            onCreateManualRestorePoint={handleCreateManualRestorePoint}
-            onRestoreFromHistoryPoint={handleRestoreFromHistoryPoint}
-            onClearHistory={handleClearHistory}
-          />
-        )}
-
-        {currentTab === 6 && (
-          <SoldTab
-            orders={orders}
-            clients={clients}
-            onDeleteOrder={handleDeleteOrder}
-          />
-        )}
-
-        {currentTab >= 7 && (
-          <Suspense fallback={<TabFallback />}>
-            {currentTab === 7  && <Market3DApp />}
-            {currentTab === 8  && <CatalogoTab />}
-            {currentTab === 9  && <MarketingTab />}
-            {currentTab === 10 && <KanbanTab />}
-            {currentTab === 11 && <MarketTab />}
-            {currentTab === 12 && <PreCheckTabNew />}
-            {currentTab === 13 && <AgendaTabNew />}
-            {currentTab === 14 && <SitesTab />}
-            {currentTab === 15 && (
-              <ClientsTab
-                clients={clients}
-                printers={printers}
+          {currentTab !== 0 && currentTab !== 2 && (
+            <div className="p-0">
+          {currentTab === 1 && (
+            <>
+              <ProductionTab
                 orders={orders}
-                onAddClient={handleAddClient}
-                onUpdateClient={handleUpdateClient}
-                onDeleteClient={handleDeleteClient}
-                onAddPrinter={handleAddPrinter}
-                onUpdatePrinter={handleUpdatePrinter}
-                onDeletePrinter={handleDeletePrinter}
+                printers={printers}
+                filamentStocks={filamentStocks}
+                clients={clients}
                 onAddOrder={handleAddOrder}
-                viewMode="prospect"
+                onAddClient={handleAddClient}
+                onUpdateOrder={handleUpdateOrder}
+                onDeleteOrder={handleDeleteOrder}
+                onSimulateTick={handleSimulateTick}
+                onUpdateFilament={handleUpdateFilamentStock}
+                onUpdatePrinter={handleUpdatePrinter}
+                viewMode="orders"
               />
-            )}
-            {currentTab === 16 && (
-              <div className="space-y-4">
-                {/* Sub-abas Impressoras */}
-                <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-                  {[
-                    { id: 'GERAL', label: 'Visão Geral' },
-                    { id: 'MANUT', label: 'Manutenção' },
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => setPrintersSubTab(t.id as 'GERAL' | 'MANUT')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        printersSubTab === t.id
-                          ? 'bg-[#b7ff00] text-black'
-                          : 'text-white/60 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                {printersSubTab === 'MANUT' ? (
-                  <ManutencaoTab printers={printers} onUpdatePrinter={handleUpdatePrinter} />
-                ) : (<>
-                <ProductionTab
-                  orders={orders}
-                  printers={printers}
-                  filamentStocks={filamentStocks}
-                  clients={clients}
-                  onAddOrder={handleAddOrder}
-                  onAddClient={handleAddClient}
-                  onUpdateOrder={handleUpdateOrder}
-                  onDeleteOrder={handleDeleteOrder}
-                  onSimulateTick={handleSimulateTick}
-                  onUpdateFilament={handleUpdateFilamentStock}
-                  onUpdatePrinter={handleUpdatePrinter}
-                  viewMode="monitor"
-                />
-                <PrinterQueueList printers={printers} orders={orders} />
+            </>
+          )}
+
+          {currentTab === 3 && (
+            <>
+              <IntegrationTab
+                onImportOrder={handleImportExternalOrder}
+                importedExternalIds={importedExternalIds}
+                orders={orders}
+                onUpdateOrder={handleUpdateOrder}
+              />
+            </>
+          )}
+
+          {currentTab === 4 && (
+            <>
+              <CostsTab
+              filamentStocks={filamentStocks}
+              shoppingItems={shoppingItems}
+              expenses={expenses}
+              onAddFilament={handleAddFilamentStock}
+              onUpdateFilament={handleUpdateFilamentStock}
+              onAddShoppingItem={handleAddShoppingItem}
+              onToggleShoppingItem={handleToggleShoppingItem}
+              onDeleteShoppingItem={handleDeleteShoppingItem}
+              onDeleteFilament={handleDeleteFilamentStock}
+              onAddExpense={handleAddExpense}
+              onDeleteExpense={handleDeleteExpense}
+              onUpdateExpense={handleUpdateExpense}
+              suppliesStocks={suppliesStocks}
+              setSuppliesStocks={setSuppliesStocks}
+              lastAuditDate={lastAuditDate}
+              setLastAuditDate={setLastAuditDate}
+              />
+            </>
+          )}
+
+          {currentTab === 5 && (
+            <SettingsTab
+              clients={clients}
+              printers={printers}
+              orders={orders}
+              filamentStocks={filamentStocks}
+              expenses={expenses}
+              shoppingItems={shoppingItems}
+              onImportAllData={handleImportAllData}
+              brandConfig={brandConfig}
+              onUpdateBrandConfig={setBrandConfig}
+              tuyaDevices={tuyaDevices}
+              onUpdateTuyaDevices={setTuyaDevices}
+              rollbackHistory={rollbackHistory}
+              onCreateManualRestorePoint={handleCreateManualRestorePoint}
+              onRestoreFromHistoryPoint={handleRestoreFromHistoryPoint}
+              onClearHistory={handleClearHistory}
+            />
+          )}
+
+          {currentTab === 6 && (
+            <SoldTab
+              orders={orders}
+              clients={clients}
+              onDeleteOrder={handleDeleteOrder}
+            />
+          )}
+
+          {currentTab >= 7 && (
+            <>
+              {currentTab === 7  && <Market3DApp />}
+              {currentTab === 8  && <CatalogoTab />}
+              {currentTab === 9  && <MarketingTab />}
+              {currentTab === 10 && <KanbanTab />}
+              {currentTab === 11 && <MarketTab />}
+              {currentTab === 12 && <PreCheckTabNew />}
+              {currentTab === 13 && <AgendaTabNew />}
+              {currentTab === 14 && <SitesTab />}
+              {currentTab === 15 && (
                 <ClientsTab
                   clients={clients}
                   printers={printers}
@@ -2354,33 +2301,89 @@ export default function App() {
                   onUpdatePrinter={handleUpdatePrinter}
                   onDeletePrinter={handleDeletePrinter}
                   onAddOrder={handleAddOrder}
-                  viewMode="printers"
-                  showAddPrinterForm={showAddPrinterFormTab16}
-                  onToggleAddPrinterForm={() => setShowAddPrinterFormTab16(v => !v)}
+                  viewMode="prospect"
                 />
-                </>)}
-              </div>
-            )}
-            {currentTab === 17 && <ContabilidadeTab />}
-            {currentTab === 19 && (
-              <OrcamentosTab clients={clients} orders={orders} setOrders={setOrders} />
-            )}
-            {currentTab === 20 && <WhatsAppTab />}
-          </Suspense>
-        )}
-          </div>
-        )}
+              )}
+              {currentTab === 16 && (
+                <div className="space-y-4">
+                  {/* Sub-abas Impressoras */}
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+                    {[
+                      { id: 'GERAL', label: 'Visão Geral' },
+                      { id: 'MANUT', label: 'Manutenção' },
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setPrintersSubTab(t.id as 'GERAL' | 'MANUT')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          printersSubTab === t.id
+                            ? 'bg-[#b7ff00] text-black'
+                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  {printersSubTab === 'MANUT' ? (
+                    <ManutencaoTab printers={printers} onUpdatePrinter={handleUpdatePrinter} />
+                  ) : (<>
+                  <ProductionTab
+                    orders={orders}
+                    printers={printers}
+                    filamentStocks={filamentStocks}
+                    clients={clients}
+                    onAddOrder={handleAddOrder}
+                    onAddClient={handleAddClient}
+                    onUpdateOrder={handleUpdateOrder}
+                    onDeleteOrder={handleDeleteOrder}
+                    onSimulateTick={handleSimulateTick}
+                    onUpdateFilament={handleUpdateFilamentStock}
+                    onUpdatePrinter={handleUpdatePrinter}
+                    viewMode="monitor"
+                  />
+                  <PrinterQueueList printers={printers} orders={orders} />
+                  <ClientsTab
+                    clients={clients}
+                    printers={printers}
+                    orders={orders}
+                    onAddClient={handleAddClient}
+                    onUpdateClient={handleUpdateClient}
+                    onDeleteClient={handleDeleteClient}
+                    onAddPrinter={handleAddPrinter}
+                    onUpdatePrinter={handleUpdatePrinter}
+                    onDeletePrinter={handleDeletePrinter}
+                    onAddOrder={handleAddOrder}
+                    viewMode="printers"
+                    showAddPrinterForm={showAddPrinterFormTab16}
+                    onToggleAddPrinterForm={() => setShowAddPrinterFormTab16(v => !v)}
+                  />
+                  </>)}
+                </div>
+              )}
+              {currentTab === 17 && <ContabilidadeTab />}
+              {currentTab === 19 && (
+                <OrcamentosTab clients={clients} orders={orders} setOrders={setOrders} />
+              )}
+              {currentTab === 20 && <WhatsAppTab />}
+            </>
+          )}
+            </div>
+          )}
+        </Suspense>
       </main>
 
 
       {/* OK LOJA VOICE & SMART AI ASSISTANT (v3.2.3.6 Update) */}
-      <OkLojaAssistant 
-        orders={orders}
-        printers={printers}
-        clients={clients}
-        filamentStocks={filamentStocks}
-        brandName={brandConfig.name}
-      />
+      <Suspense fallback={null}>
+        <OkLojaAssistant 
+          orders={orders}
+          printers={printers}
+          clients={clients}
+          filamentStocks={filamentStocks}
+          brandName={brandConfig.name}
+        />
+      </Suspense>
 
       {/* ONBOARDING DIALOG / WELCOME WIZARD */}
       {showSetupModal && (

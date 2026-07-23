@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const VERSION_HISTORY: VersionEntry[] = [
   {
+    version: "3.0.0.1.0",
+    date: "2026-07-22",
+    changes: [
+      "Filtro avançado por texto e data no histórico de pontos de restauro (rollbackHistory) na aba de Ajustes",
+      "Validação estrita de integridade dos dados no hook de backup automático (useAutoBackup) prevenindo salvamento de arquivos corrompidos",
+    ],
+  },
+  {
+    version: "3.0.0.0.9",
+    date: "2026-07-22",
+    changes: [
+      "Atualização da engine de conexão da Agenda para o Hermes Engine",
+      "Novo modal e suporte de Webhook para Hermes Smart Calendar Engine com disparo automático",
+    ],
+  },
+  {
     version: "3.0.0.0.8",
     date: "2026-07-21",
     changes: [

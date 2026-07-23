@@ -1,0 +1,8 @@
+# Cursor Rules for Gestão3D (PrintFlow 3D / Market3D)
+
+- Stack: React 19, TanStack Start / Router, Vite 7, Tailwind CSS v4, TypeScript 5.
+- Component Style: Functional components with hooks, Lucide icons, explicit TypeScript interfaces.
+- Imports: Group imports logically (external libs -> internal modules -> types -> styles).
+- Performance: Use `useMemo` for heavy computations (filtering products, stats aggregation).
+- Code-Splitting: Lazy load heavy tab views in ERP.
+- Quality: Ensure `npm run lint` and `npm run build` pass without errors.

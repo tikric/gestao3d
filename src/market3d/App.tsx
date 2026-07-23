@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { INITIAL_CATEGORIES, ALL_PRODUCTS } from "./data";
 import { Category, SellerReport } from "./types";
 import {
@@ -749,66 +749,86 @@ export default function App() {
   };
 
   // Filter category list with quick-finder
-  const filteredCategories = categories.filter(
-    (cat) =>
-      cat.id !== "todos" && cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase()),
+  const filteredCategories = useMemo(
+    () =>
+      categories.filter(
+        (cat) =>
+          cat.id !== "todos" && cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase()),
+      ),
+    [categories, categorySearchQuery],
   );
 
   // Filter products feed by search query and platform popularity
-  const normalizeTitle = (t: string) =>
-    t
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  const filteredProducts = useMemo(() => {
+    const normalizeTitle = (t: string) =>
+      t
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 
-  const seenTitles = new Set<string>();
-  const filteredProducts = [...dynamicProducts, ...ALL_PRODUCTS]
-    .map((p) => getProductForSelectedPlatform(p, selectedPlatform, dynamicProducts))
-    .filter((p) => {
-      const matchesCategory = selectedCategoryId === "todos" || p.categoryId === selectedCategoryId;
-      const matchesSearch =
-        searchQuery.trim() === "" ||
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase()));
-      if (!matchesCategory || !matchesSearch) return false;
-      // Dedup pelo título completo normalizado por categoria, garantindo
-      // ao menos 50 itens distintos por subcategoria sem repetição.
-      const dedupeKey = `${p.categoryId}::${normalizeTitle(p.title)}`;
-      if (seenTitles.has(dedupeKey)) return false;
-      seenTitles.add(dedupeKey);
-      return true;
-    })
-    .sort((a, b) => b.monthlySales - a.monthlySales);
+    const queryLower = searchQuery.trim().toLowerCase();
+    const seenTitles = new Set<string>();
+
+    return [...dynamicProducts, ...ALL_PRODUCTS]
+      .map((p) => getProductForSelectedPlatform(p, selectedPlatform, dynamicProducts))
+      .filter((p) => {
+        const matchesCategory =
+          selectedCategoryId === "todos" || p.categoryId === selectedCategoryId;
+        const matchesSearch =
+          !queryLower ||
+          p.title.toLowerCase().includes(queryLower) ||
+          p.description.toLowerCase().includes(queryLower) ||
+          p.keywords.some((k) => k.toLowerCase().includes(queryLower));
+        if (!matchesCategory || !matchesSearch) return false;
+
+        const dedupeKey = `${p.categoryId}::${normalizeTitle(p.title)}`;
+        if (seenTitles.has(dedupeKey)) return false;
+        seenTitles.add(dedupeKey);
+        return true;
+      })
+      .sort((a, b) => b.monthlySales - a.monthlySales);
+  }, [dynamicProducts, selectedPlatform, selectedCategoryId, searchQuery]);
 
   // Category-wide dynamically computed metrics
-  const totalMonthlySales = filteredProducts.reduce((sum, p) => sum + p.monthlySales, 0);
-  const totalFaturamento = filteredProducts.reduce(
-    (sum, p) => sum + p.monthlySales * p.pricePromo,
-    0,
-  );
-  const avgMargin =
-    filteredProducts.length > 0
-      ? Math.round(
-          filteredProducts.reduce((sum, p) => sum + p.estimatedMargin, 0) / filteredProducts.length,
-        )
-      : 0;
-  const avgCompetitors =
-    filteredProducts.length > 0
-      ? Math.round(
-          filteredProducts.reduce((sum, p) => sum + p.competitorsCount, 0) /
-            filteredProducts.length,
-        )
-      : 0;
+  const { totalMonthlySales, totalFaturamento, avgMargin, avgCompetitors } = useMemo(() => {
+    const totalSales = filteredProducts.reduce((sum, p) => sum + p.monthlySales, 0);
+    const totalFat = filteredProducts.reduce((sum, p) => sum + p.monthlySales * p.pricePromo, 0);
+    const margin =
+      filteredProducts.length > 0
+        ? Math.round(
+            filteredProducts.reduce((sum, p) => sum + p.estimatedMargin, 0) /
+              filteredProducts.length,
+          )
+        : 0;
+    const comps =
+      filteredProducts.length > 0
+        ? Math.round(
+            filteredProducts.reduce((sum, p) => sum + p.competitorsCount, 0) /
+              filteredProducts.length,
+          )
+        : 0;
 
-  const getCategoryCount = (catId: string) => {
+    return {
+      totalMonthlySales: totalSales,
+      totalFaturamento: totalFat,
+      avgMargin: margin,
+      avgCompetitors: comps,
+    };
+  }, [filteredProducts]);
+
+  const categoryCountsMap = useMemo(() => {
     const totalList = [...dynamicProducts, ...ALL_PRODUCTS];
-    if (catId === "todos") return totalList.length;
-    return totalList.filter((p) => p.categoryId === catId).length;
-  };
+    const counts: Record<string, number> = { todos: totalList.length };
+    for (const p of totalList) {
+      counts[p.categoryId] = (counts[p.categoryId] || 0) + 1;
+    }
+    return counts;
+  }, [dynamicProducts]);
+
+  const getCategoryCount = (catId: string) => categoryCountsMap[catId] || 0;
 
   const currentCategoryName =
     categories.find((c) => c.id === selectedCategoryId)?.name || "Todos os Segmentos";
@@ -846,7 +866,8 @@ export default function App() {
       cancelled = true;
       controller.abort();
     };
-  }, [selectedCategoryId, selectedPlatform, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId, selectedPlatform, searchQuery, filteredProducts]);
 
   return (
     <div
@@ -2401,6 +2422,7 @@ function WorkbenchPanel({
     };
 
     fetchKitIdeas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report.id, activeTab]);
 
   const isPlaceholderImage = (url?: string) =>
@@ -2462,6 +2484,7 @@ function WorkbenchPanel({
         .trim();
       setPixabayQuery(cleanSearchQuery);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report.id, report.imageUrl]);
 
   const handleManualSearch = async () => {

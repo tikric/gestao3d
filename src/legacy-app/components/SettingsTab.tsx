@@ -354,6 +354,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Rollback History filter states
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyDateFilter, setHistoryDateFilter] = useState('');
+
   // Help Modal states
   const [helpTitle, setHelpTitle] = useState('');
   const [helpText, setHelpText] = useState('');
@@ -2210,52 +2214,145 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
               </div>
 
-              {/* List of restore points */}
-              <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
-                {rollbackHistory && rollbackHistory.length > 0 ? (
-                  [...rollbackHistory].reverse().map((point: any) => {
-                    const date = new Date(point.timestamp);
-                    const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    const dateStr = date.toLocaleDateString('pt-BR');
-                    return (
-                      <div
-                        key={point.id}
-                        className="p-2.5 rounded-xl bg-[#0C0E0D] border border-[#232B27]/60 hover:border-amber-500/20 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+              {/* Filtro e Busca do Histórico */}
+              {rollbackHistory && rollbackHistory.length > 0 && (
+                <div className="flex flex-col sm:flex-row gap-2 bg-[#0C0E0D] border border-[#232B27]/40 p-2.5 rounded-xl">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={historySearchQuery}
+                      onChange={(e) => setHistorySearchQuery(e.target.value)}
+                      placeholder="Filtrar por descrição, Nº ou horário..."
+                      className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-[#111613] border border-[#2F3D35] text-[#F1F4EE] text-[11px] placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/50"
+                    />
+                    {historySearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                        title="Limpar texto"
                       >
-                        <div className="space-y-0.5 text-left">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-black font-mono bg-amber-400 text-black px-1.5 py-0.2 rounded">
-                              Nº {point.id}
-                            </span>
-                            <span className="text-[10px] text-zinc-400 font-mono">
-                              {dateStr} às {timeStr}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-[#F1F4EE] font-medium leading-tight">
-                            {point.description}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`Deseja reverter todas as tabelas do painel para o Ponto Nº ${point.id}? (Seu estado atual será salvo como precaução)`)) {
-                              if (onRestoreFromHistoryPoint) onRestoreFromHistoryPoint(point.id);
-                            }
-                          }}
-                          className="w-full sm:w-auto px-3 py-1.5 bg-[#1C2420] hover:bg-amber-400 hover:text-black border border-[#2F3D35] hover:border-amber-400 text-zinc-300 hover:text-black rounded-lg text-[10px] font-black uppercase transition shrink-0 flex items-center justify-center gap-1 select-none cursor-pointer"
-                        >
-                          <RotateCcw className="h-3 w-3 shrink-0" />
-                          Reverter para este ponto
-                        </button>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="py-6 text-center text-[11px] text-zinc-500 border border-dashed border-[#232B27] rounded-xl">
-                    Nenhum ponto de restauro criado ainda. Faça alterações no painel para salvar pontos automáticos!
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={historyDateFilter}
+                      onChange={(e) => setHistoryDateFilter(e.target.value)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#111613] border border-[#2F3D35] text-[#F1F4EE] text-[11px] focus:outline-none focus:border-amber-500/50 [color-scheme:dark]"
+                      title="Filtrar por data específica"
+                    />
+                    {(historySearchQuery || historyDateFilter) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHistorySearchQuery('');
+                          setHistoryDateFilter('');
+                        }}
+                        className="px-2.5 py-1.5 bg-[#1C2420] hover:bg-[#232F2A] border border-[#2F3D35] text-amber-400 text-[10px] font-bold rounded-lg transition shrink-0 flex items-center gap-1 cursor-pointer"
+                        title="Limpar todos os filtros"
+                      >
+                        <X className="h-3 w-3" />
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* List of restore points */}
+              {(() => {
+                const reversedHistory = rollbackHistory ? [...rollbackHistory].reverse() : [];
+                const query = historySearchQuery.trim().toLowerCase();
+                const filteredHistory = reversedHistory.filter((point: any) => {
+                  const date = new Date(point.timestamp);
+                  const dateStr = date.toLocaleDateString('pt-BR');
+                  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  const isoDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+                  if (historyDateFilter && isoDateStr !== historyDateFilter) {
+                    return false;
+                  }
+
+                  if (query) {
+                    const matchDesc = (point.description || '').toLowerCase().includes(query);
+                    const matchId = String(point.id).includes(query);
+                    const matchDate = dateStr.includes(query) || timeStr.includes(query);
+                    return matchDesc || matchId || matchDate;
+                  }
+
+                  return true;
+                });
+
+                return (
+                  <div className="space-y-2">
+                    {rollbackHistory && rollbackHistory.length > 0 && (
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 px-0.5 font-mono">
+                        <span>
+                          {filteredHistory.length === rollbackHistory.length
+                            ? `Total: ${rollbackHistory.length} ponto(s) registrado(s)`
+                            : `Exibindo ${filteredHistory.length} de ${rollbackHistory.length} ponto(s)`}
+                        </span>
+                        {(historySearchQuery || historyDateFilter) && (
+                          <span className="text-amber-400/90 font-sans">Filtro ativo</span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin">
+                      {filteredHistory.length > 0 ? (
+                        filteredHistory.map((point: any) => {
+                          const date = new Date(point.timestamp);
+                          const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                          const dateStr = date.toLocaleDateString('pt-BR');
+                          return (
+                            <div
+                              key={point.id}
+                              className="p-2.5 rounded-xl bg-[#0C0E0D] border border-[#232B27]/60 hover:border-amber-500/20 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                            >
+                              <div className="space-y-0.5 text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-black font-mono bg-amber-400 text-black px-1.5 py-0.2 rounded">
+                                    Nº {point.id}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400 font-mono">
+                                    {dateStr} às {timeStr}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#F1F4EE] font-medium leading-tight">
+                                  {point.description}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Deseja reverter todas as tabelas do painel para o Ponto Nº ${point.id}? (Seu estado atual será salvo como precaução)`)) {
+                                    if (onRestoreFromHistoryPoint) onRestoreFromHistoryPoint(point.id);
+                                  }
+                                }}
+                                className="w-full sm:w-auto px-3 py-1.5 bg-[#1C2420] hover:bg-amber-400 hover:text-black border border-[#2F3D35] hover:border-amber-400 text-zinc-300 hover:text-black rounded-lg text-[10px] font-black uppercase transition shrink-0 flex items-center justify-center gap-1 select-none cursor-pointer"
+                              >
+                                <RotateCcw className="h-3 w-3 shrink-0" />
+                                Reverter para este ponto
+                              </button>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="py-6 text-center text-[11px] text-zinc-500 border border-dashed border-[#232B27] rounded-xl">
+                          {rollbackHistory && rollbackHistory.length > 0
+                            ? 'Nenhum ponto de restauro atende aos critérios de busca/data.'
+                            : 'Nenhum ponto de restauro criado ainda. Faça alterações no painel para salvar pontos automáticos!'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {showClipboardBackup && (
