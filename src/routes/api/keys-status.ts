@@ -14,6 +14,7 @@ export const Route = createFileRoute("/api/keys-status")({
             GROQ_API_KEY: !!process.env.GROQ_API_KEY,
             JINA_API_KEY: !!process.env.JINA_API_KEY,
             SERPAPI_KEY: !!process.env.SERPAPI_KEY,
+            FIRECRAWL_API_KEY: !!process.env.FIRECRAWL_API_KEY,
           }),
           { headers: { "Content-Type": "application/json" } },
         );

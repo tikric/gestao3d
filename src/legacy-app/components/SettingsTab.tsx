@@ -44,6 +44,7 @@ import { ApiKeyField } from './ApiKeyField';
 import { pickBackupFolder, getBackupFolderName, clearBackupFolder, runBackupNow, getDropboxConfig, setDropboxConfig, testDropbox, getDropboxOAuth, buildDropboxAuthUrl, exchangeDropboxCode, disconnectDropboxOAuth, getGDriveConfig, setGDriveConfig, testGDrive } from '../hooks/useAutoBackup';
 import { getTelegramChatId, setTelegramChatId, getTelegramAutoSend, setTelegramAutoSend, sendStlToTelegram } from '../lib/telegram';
 import { createCompleteBackup, isGestao3DBackup, restoreCompleteBackup } from '../utils/fullBackup';
+import { OpenCodeIntegrationControl } from './OpenCodeIntegrationControl';
 
 function TelegramStlControl() {
   const [chatId, setChatIdState] = React.useState(() => getTelegramChatId());
@@ -797,6 +798,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     serpKey2: localSerpKey2, setSerpKey2: setLocalSerpKey2,
     tavilyKey: localTavilyKey, setTavilyKey: setLocalTavilyKey,
     jinaKey: localJinaKey, setJinaKey: setLocalJinaKey,
+    firecrawlKey: localFirecrawlKey, setFirecrawlKey: setLocalFirecrawlKey,
   } = useCustomKeys();
   const [showGroqKey, setShowGroqKey] = useState(false);
 
@@ -1846,7 +1848,27 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           showError={showError}
         />
 
-        {/* 6. GOOGLE SEARCH GROUNDING TOGGLE */}
+        {/* 6. FIRECRAWL AI KEY FIELD */}
+        <ApiKeyField
+          icon={<Zap className="h-3.5 w-3.5 text-orange-400" />}
+          label="Chave de API do Firecrawl AI (Web Scraping & Produtos Reais)"
+          description="Varre e extrai preços reais de e-commerces (Mercado Livre, Shopee, Amazon, 3DLab) para cotações e aba Preços."
+          placeholder="Cole sua Firecrawl API Key aqui (ex: fc-...)"
+          value={localFirecrawlKey}
+          onChange={setLocalFirecrawlKey}
+          storageKey="bambuzau_custom_firecrawl_key"
+          inputId="input-firecrawl-key-unified"
+          buttonId="btn-save-firecrawl-unified"
+          saveLabel="Salvar Firecrawl"
+          buttonClass="bg-orange-600 hover:bg-orange-500 text-white"
+          successMsg="Sua chave de API do Firecrawl AI foi salva com sucesso!"
+          errorPrefix="Erro ao salvar Firecrawl"
+          link={{ href: "https://www.firecrawl.dev/", text: "Obter Chave Grátis ↗", className: "text-[10px] text-orange-400 hover:underline font-semibold font-sans flex items-center gap-0.5" }}
+          showSuccess={showSuccess}
+          showError={showError}
+        />
+
+        {/* 7. GOOGLE SEARCH GROUNDING TOGGLE */}
         <div className="flex items-center justify-between p-4 bg-[#0A0D0B] border border-[#232B27] rounded-2xl font-sans">
           <div className="space-y-0.5">
             <span className="text-[9px] uppercase tracking-wider font-extrabold text-[#52b788] bg-[#52b788]/10 px-1.5 py-0.5 rounded border border-[#52b788]/25 inline-block font-mono mb-1">Filtro de busca em tempo real</span>
@@ -1888,6 +1910,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 const trimmedSerp2 = (localSerpKey2 || '').trim();
                 const trimmedTavily = (localTavilyKey || '').trim();
                 const trimmedJina = (localJinaKey || '').trim();
+                const trimmedFirecrawl = (localFirecrawlKey || '').trim();
                 
                 if (trimmedGemini) {
                   const check = validateApiKeyFormat(trimmedGemini);
@@ -1924,6 +1947,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 setLocalSerpKey2(trimmedSerp2);
                 setLocalTavilyKey(trimmedTavily);
                 setLocalJinaKey(trimmedJina);
+                setLocalFirecrawlKey(trimmedFirecrawl);
                 
                 safeStorage.setItem('bambuzau_custom_gemini_key', trimmedGemini);
                 safeStorage.setItem('bambuzau_custom_groq_key', trimmedGroq);
@@ -1931,9 +1955,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 safeStorage.setItem('bambuzau_custom_serp_key_2', trimmedSerp2);
                 safeStorage.setItem('bambuzau_custom_tavily_key', trimmedTavily);
                 safeStorage.setItem('bambuzau_custom_jina_key', trimmedJina);
+                safeStorage.setItem('bambuzau_custom_firecrawl_key', trimmedFirecrawl);
                 
                 window.dispatchEvent(new Event('bambuzau_keys_updated'));
-                showSuccess('✓ Todas as suas chaves de APIs (Gemini, Groq, SerpApi, Tavily e Jina AI) foram gravadas e salvas com absoluto sucesso!');
+                showSuccess('✓ Todas as suas chaves de APIs (Gemini, Groq, SerpApi, Tavily, Jina e Firecrawl AI) foram gravadas e salvas com absoluto sucesso!');
               } catch (e: any) {
                 showError('Erro ao realizar salvamento coletivo: ' + e.message);
               }
@@ -2161,6 +2186,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
            <DropboxOAuthControl />
            <GDriveBackupControl />
            <TelegramStlControl />
+           <OpenCodeIntegrationControl />
 
             {/* Histórico de Alterações & Pontos de Restauro Automáticos */}
             <div className="mt-4 pt-4 border-t border-[#232B27]/60 space-y-3">

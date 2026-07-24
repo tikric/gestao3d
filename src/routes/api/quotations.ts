@@ -29,6 +29,16 @@ function getFallbackKey(request: Request, url: URL): string {
   return "";
 }
 
+function getFirecrawlKey(request: Request, url: URL): string {
+  const q = url.searchParams.get("firecrawl_key");
+  const h = request.headers.get("x-custom-firecrawl-key");
+  if (isValidKey(q)) return q!.trim();
+  if (isValidKey(h)) return h!.trim();
+  const env = process.env.FIRECRAWL_API_KEY;
+  if (isValidKey(env)) return env!.trim();
+  return "";
+}
+
 function cleanGoogleShoppingUrl(urlStr: string): string {
   if (!urlStr || typeof urlStr !== "string") return urlStr;
   try {
@@ -239,6 +249,74 @@ async function fetchShopping(query: string, apiKey: string) {
   }
 }
 
+async function fetchFirecrawlShopping(query: string, apiKey: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        query: `${query} preco comprar brasil mercado livre shopee amazon`,
+        limit: 8,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    const items = json.data || json.results || [];
+
+    return items
+      .map((item: any) => {
+        const title = item.title || item.metadata?.title || "Produto 3D";
+        const description = item.description || item.metadata?.description || item.markdown || "";
+        const urlStr = item.url || item.metadata?.url || "";
+
+        // Extract price R$ XX,XX or R$ XX.XX
+        let price = 0;
+        const priceMatch =
+          (description + " " + title).match(/R\$\s*([0-9]{1,4}[.,][0-9]{2})/i) ||
+          (description + " " + title).match(/R\$\s*([0-9]{2,4})/i);
+        if (priceMatch) {
+          price = Number(priceMatch[1].replace(".", "").replace(",", "."));
+        }
+
+        // Infer store name from URL hostname
+        let storeName = "Web Store";
+        try {
+          const host = new URL(urlStr).hostname.replace(/^www\./, "");
+          if (host.includes("mercadolivre")) storeName = "Mercado Livre";
+          else if (host.includes("shopee")) storeName = "Shopee";
+          else if (host.includes("amazon")) storeName = "Amazon BR";
+          else if (host.includes("3dlab")) storeName = "3DLab";
+          else if (host.includes("voolt3d")) storeName = "Voolt3D";
+          else if (host.includes("magazineluiza") || host.includes("magalu")) storeName = "Magalu";
+          else storeName = host;
+        } catch {}
+
+        return {
+          productId: `fc-${Math.random().toString(36).substring(2, 8)}`,
+          storeName,
+          productName: title,
+          price,
+          rating: 4.8,
+          reviews: 18,
+          feature: "Extrator Web AI (Firecrawl)",
+          buyUrl: urlStr || merchantSearchUrl(storeName, title),
+          thumbnail: "",
+        };
+      })
+      .filter((o: any) => o.price > 0 || o.buyUrl);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const DEFAULT_MATERIALS: Array<{ type: string; query: string }> = [
   { type: "PLA", query: "filamento pla 1.75mm 1kg impressora 3d" },
   { type: "PETG", query: "filamento petg 1.75mm 1kg impressora 3d" },
@@ -321,7 +399,9 @@ export const Route = createFileRoute("/api/quotations")({
         const customQ = sanitizeQuery(url.searchParams.get("q") || url.searchParams.get("query"));
         const apiKey = getKey(request, url);
         const fallbackKey = getFallbackKey(request, url);
-        if (!apiKey && !fallbackKey) {
+        const firecrawlKey = getFirecrawlKey(request, url);
+
+        if (!apiKey && !fallbackKey && !firecrawlKey) {
           if (customQ) {
             const safeType = sanitizeType(url.searchParams.get("type")) || "Produtos";
             return Response.json([
@@ -329,7 +409,7 @@ export const Route = createFileRoute("/api/quotations")({
                 type: safeType,
                 offers: [],
                 searchQuery: customQ,
-                error: "Chave SerpApi ausente ou inválida.",
+                error: "Chave SerpApi ou Firecrawl ausente ou inválida nas Configurações.",
               },
             ]);
           }
@@ -338,15 +418,22 @@ export const Route = createFileRoute("/api/quotations")({
               type: m.type,
               searchQuery: m.query,
               offers: [],
-              error: "Chave SerpApi ausente ou inválida.",
+              error: "Chave SerpApi ou Firecrawl ausente ou inválida nas Configurações.",
             })),
           );
         }
+
         const fetchWithFallback = async (q: string) => {
           let offers: any[] = [];
           if (apiKey) offers = await fetchShopping(q, apiKey);
           if ((!offers || offers.length === 0) && fallbackKey) {
             offers = await fetchShopping(q, fallbackKey);
+          }
+          if ((!offers || offers.length === 0) && firecrawlKey) {
+            offers = await fetchFirecrawlShopping(q, firecrawlKey);
+          } else if (firecrawlKey && offers && offers.length > 0) {
+            const fcOffers = await fetchFirecrawlShopping(q, firecrawlKey);
+            offers = [...offers, ...fcOffers];
           }
           return offers;
         };

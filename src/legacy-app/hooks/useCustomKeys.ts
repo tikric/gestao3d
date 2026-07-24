@@ -8,6 +8,7 @@ const KEY_MAP = {
   serp2: 'bambuzau_custom_serp_key_2',
   tavily: 'bambuzau_custom_tavily_key',
   jina: 'bambuzau_custom_jina_key',
+  firecrawl: 'bambuzau_custom_firecrawl_key',
 } as const;
 
 type KeyName = keyof typeof KEY_MAP;
@@ -21,6 +22,7 @@ export const useCustomKeys = () => {
   const [serpKey2, setSerpKey2] = useState<string>(() => read('serp2'));
   const [tavilyKey, setTavilyKey] = useState<string>(() => read('tavily'));
   const [jinaKey, setJinaKey] = useState<string>(() => read('jina'));
+  const [firecrawlKey, setFirecrawlKey] = useState<string>(() => read('firecrawl'));
 
   useEffect(() => {
     const sync = () => {
@@ -30,6 +32,7 @@ export const useCustomKeys = () => {
       setSerpKey2(read('serp2'));
       setTavilyKey(read('tavily'));
       setJinaKey(read('jina'));
+      setFirecrawlKey(read('firecrawl'));
     };
     window.addEventListener('bambuzau_keys_updated', sync);
     return () => window.removeEventListener('bambuzau_keys_updated', sync);
@@ -42,5 +45,6 @@ export const useCustomKeys = () => {
     serpKey2, setSerpKey2,
     tavilyKey, setTavilyKey,
     jinaKey, setJinaKey,
+    firecrawlKey, setFirecrawlKey,
   };
 };
